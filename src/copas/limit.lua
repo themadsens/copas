@@ -10,9 +10,27 @@ local pack = table.pack or function(...) return {n=select('#',...),...} end
 local unpack = function(t) return (table.unpack or unpack)(t, 1, t.n or #t) end
 
 local pcall = pcall
+local xpcall = xpcall
 if _VERSION=="Lua 5.1" then     -- obsolete: only for Lua 5.1 compatibility
   pcall = require("coxpcall").pcall
+  xpcall = require("coxpcall").xpcall
+  
+ -- patch xpcall to take function args (standard in 5.2+)
+ local xp = xpcall
+  xpcall = function(f, err, ...)
+    local a = { n = select("#", ...), ...}
+    return xp(function(...) return f(unpack(a,1,a.n)) end, err)
+  end
 end
+
+-- error handler to attach stacktrack to error message
+local ehandler = function(err) return debug.traceback(tostring(err)) end
+
+-- pcall with stacktrace attached to the error. 
+local epcall = function(fn, ...)
+  return xpcall(fn, ehandler, ...)
+end
+
 
 -- Add a task to the queue, returns the coroutine created
 -- identical to `copas.addthread`. Can be called while the 
@@ -21,7 +39,7 @@ local function add(self, task, ...)
   local carg = pack(...)
   local coro = copas.addthread(function()
       copas.sleep(-1)                            -- go to sleep until being woken
-      local suc, err = pcall(task, unpack(carg)) -- start the task
+      local suc, err = epcall(task, unpack(carg)) -- start the task
       self:removethread(coroutine.running())           -- dismiss ourselves
       if not suc then error(err) end             -- rethrow error
     end)
