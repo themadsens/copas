@@ -4,6 +4,7 @@
 
 local copas = require("copas")
 local smtp = require("socket.smtp")
+local socket = require("socket")
 
 local create = function() return copas.wrap(socket.tcp()) end
 local forwards = { -- setting these will be forwarded to the original smtp module

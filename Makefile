@@ -39,3 +39,7 @@ coverage:
 
 clean:
 	$(RM) luacov.stats.out luacov.report.out
+
+check:
+	# https://luacheck.readthedocs.io/en/stable/warnings.html
+	luacheck --no-color --codes --ignore 6 421 431 212 311 --std max src/copas.lua src/copas/*.lua
