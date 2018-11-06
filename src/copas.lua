@@ -20,6 +20,10 @@ end
 local socket = require "socket"
 local gettime = socket.gettime
 local ssl -- only loaded upon demand
+local unpack = table.unpack or unpack
+local fnil = function()end
+local ftrue = function() return true end
+local foreignHandler = fnil
 
 local WATCH_DOG_TIMEOUT = 120
 local UDP_DATAGRAM_MAX = 8192  -- TODO: dynamically get this value from LuaSocket
@@ -80,6 +84,7 @@ local function newset()
   local set = {}
   local q = {}
   setmetatable(set, { __index = {
+                        isCopas = ftrue,
                         insert = function(set, value)
                                    if not reverse[value] then
                                      set[#set + 1] = value
@@ -123,12 +128,12 @@ local function newset()
   return set
 end
 
-local fnil = function()end
 local _sleeping = {
     times = {},  -- list with wake-up times
     cos = {},    -- list with coroutines, index matches the 'times' list
     lethargy = {}, -- list of coroutines sleeping without a wakeup time
 
+    isCopas = ftrue,
     insert = fnil,
     remove = fnil,
     push = function(self, sleeptime, co)
@@ -538,7 +543,15 @@ end
 local function _doTick (co, skt, ...)
   if not co then return end
 
-  local ok, res, new_q = coroutine.resume(co, skt, ...)
+  local vals = { coroutine.resume(co, skt, ...) }
+  local ok, res, new_q = unpack(vals)
+
+  if ok then
+    local ck1, ck2 = pcall(function(q) return q.isCopas() end, new_q)
+    if not (ck1 and ck2) then
+      return foreignHandler(co, unpack(vals))
+    end
+  end
 
   if ok and res and new_q then
     new_q:insert (res)
@@ -798,6 +811,34 @@ function copas.finished()
 end
 
 -------------------------------------------------------------------------------
+-- Check whether there is something to do.
+-- returns nil if there are no sockets for read/write nor tasks scheduled
+-- else returns three values:
+--    read-interest-sockets, write-interest-sockets, next-timeout-duration
+-------------------------------------------------------------------------------
+function copas.state()
+  return _reading, _writing, _sleeping:getnext()
+end
+
+-------------------------------------------------------------------------------
+-- Obtain iffo for integration with a foreign event loop
+--    read-interest-sockets, write-interest-sockets, next-timeout-duration
+-------------------------------------------------------------------------------
+function copas.state()
+  return _reading, _writing, _sleeping:getnext()
+end
+
+-------------------------------------------------------------------------------
+-- Set hook for non-copas yields in coroutines.
+-- Allows an embedding system to integrate copas with his own yield primitives
+-- Signature is func(ok, yield-args...)
+-------------------------------------------------------------------------------
+function copas.foreignHandler(func)
+   foreignHandler = func
+end
+
+
+-------------------------------------------------------------------------------
 -- Dispatcher endless loop.
 -- Listen to client requests and handles them forever
 -------------------------------------------------------------------------------
@@ -808,3 +849,5 @@ function copas.loop(timeout)
 end
 
 return copas
+
+-- vim: set sts=2 sw=2 et:
