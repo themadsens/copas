@@ -829,10 +829,10 @@ function copas.state()
 end
 
 -------------------------------------------------------------------------------
--- Obtain iffo for integration with a foreign event loop
+-- Obtain info for integration with a foreign event loop
 --    read-interest-sockets, write-interest-sockets, next-timeout-duration
 -------------------------------------------------------------------------------
-function copas.state()
+function copas.getState()
   return _reading, _writing, _sleeping:getnext()
 end
 
