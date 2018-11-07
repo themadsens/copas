@@ -523,17 +523,24 @@ end
 -- Error handling
 --------------------------------------------------
 
+local function __deferror (msg, co, skt)
+  print (msg, co, skt)
+end
+local _deferror = __deferror
+
 local _errhandlers = {}   -- error handler per coroutine
 
 function copas.setErrorHandler (err)
   local co = coroutine.running()
+  local ret
   if co then
+    ret = _errhandlers [co]
     _errhandlers [co] = err
+  else
+    ret = _deferror
+    _deferror = err
   end
-end
-
-local function _deferror (msg, co, skt)
-  print (msg, co, skt)
+  return ret
 end
 
 -------------------------------------------------------------------------------
