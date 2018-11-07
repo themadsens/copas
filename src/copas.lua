@@ -545,6 +545,7 @@ local function _doTick (co, skt, ...)
 
   local vals = { coroutine.resume(co, skt, ...) }
   local ok, res, new_q = unpack(vals)
+  table.remove(vals, 1)
 
   if ok then
     local ck1, ck2 = pcall(function(q) return q.isCopas() end, new_q)
@@ -837,6 +838,20 @@ function copas.foreignHandler(func)
    foreignHandler = func
 end
 
+-------------------------------------------------------------------------------
+-- Publish yield to copas for possible consumption
+-- Returns true if consumed
+-------------------------------------------------------------------------------
+function copas.foreignYield(co, ...)
+  local res, new_q = ...
+  local ck1, ck2 = pcall(function(q) return q.isCopas() end, new_q)
+
+  if res and new_q and ck1 and ck2 then
+    new_q:insert (res)
+    new_q:push (res, co)
+    return true
+  end
+end
 
 -------------------------------------------------------------------------------
 -- Dispatcher endless loop.
